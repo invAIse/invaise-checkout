@@ -130,7 +130,10 @@ function invaise_checkout_enqueue_assets() {
 // AJAX endpoint the button's JS calls (1.3.0): asks invAIse to start a hosted checkout and returns
 // its URL. Server-to-server, so the Brand's api_key:api_secret never reach the browser.
 function invaise_checkout_ajax_submit() {
-    check_ajax_referer('invaise_checkout_submit', 'nonce');
+    // 1.3.3: a JSON error instead of WordPress's bare -1, so the visitor sees what to do.
+    if (!check_ajax_referer('invaise_checkout_submit', 'nonce', false)) {
+        wp_send_json_error(['error' => 'Your session expired -- please reload the page and try again.'], 403);
+    }
 
     $activity_id = isset($_POST['activity_id']) ? (int) $_POST['activity_id'] : 0;
     $quantity    = isset($_POST['quantity']) ? max(1, min(1000, (int) $_POST['quantity'])) : 1;
@@ -178,3 +181,15 @@ function invaise_checkout_ajax_submit() {
 }
 add_action('wp_ajax_invaise_checkout_submit', 'invaise_checkout_ajax_submit');
 add_action('wp_ajax_nopriv_invaise_checkout_submit', 'invaise_checkout_ajax_submit');
+
+// 1.3.3 (invAIse card #342): the nonce printed in the page goes stale when a page cache
+// (LiteSpeed: 7 days) serves the page longer than a nonce lives (max 24 h); admin-ajax then
+// answered -1 and the button showed "Checkout could not start". The JS now asks for a fresh
+// nonce right before every submit. admin-ajax POSTs are never page-cached, and nocache_headers()
+// keeps proxies from storing the answer. The printed nonce stays as a fallback.
+function invaise_checkout_ajax_nonce() {
+    nocache_headers();
+    wp_send_json_success(['nonce' => wp_create_nonce('invaise_checkout_submit')]);
+}
+add_action('wp_ajax_invaise_checkout_nonce', 'invaise_checkout_ajax_nonce');
+add_action('wp_ajax_nopriv_invaise_checkout_nonce', 'invaise_checkout_ajax_nonce');

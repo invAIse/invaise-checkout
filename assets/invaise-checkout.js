@@ -27,9 +27,23 @@
     btn.textContent = strings.starting;
     var restore = function () { btn.disabled = false; btn.textContent = label; };
 
+    // 1.3.3 (card #342): fetch a fresh nonce first; the one printed in a cached page may be stale.
+    fetch(invaiseCheckout.ajaxUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'action=invaise_checkout_nonce',
+      credentials: 'same-origin',
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) { return (data && data.success && data.data && data.data.nonce) || invaiseCheckout.nonce; })
+      .catch(function () { return invaiseCheckout.nonce; })
+      .then(function (nonce) { submitCheckout(container, qtyInput, nonce, restore); });
+  }
+
+  function submitCheckout(container, qtyInput, nonce, restore) {
     var body = new URLSearchParams({
       action: 'invaise_checkout_submit',
-      nonce: invaiseCheckout.nonce,
+      nonce: nonce,
       activity_id: container.dataset.activityId,
       quantity: qtyInput ? qtyInput.value : 1,
       success_url: container.dataset.successUrl,
@@ -40,6 +54,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
+      credentials: 'same-origin',
     })
       .then(function (res) { return res.json(); })
       .then(function (data) {
