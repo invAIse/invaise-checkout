@@ -27,4 +27,4 @@ this plugin: the `?invaise_status=success` landing can be opened without paying,
 - **dataLayer (no revenue):** `begin_checkout` on click, using the shortcode's optional `item_name`, `price` and `currency`
   attributes. On return it pushes `checkout_return` or `checkout_cancelled`, "returned from payment, not a confirmed
   purchase".
-- **Tests:** `node --test tests/`. They are kept out of the release zip by `.gitattributes`.
+- **Tests:** `node --test tests/*.test.js`. They are kept out of the release zip by `.gitattributes`.
