@@ -22,6 +22,14 @@ add_action('admin_init', function () {
     register_setting('invaise_checkout_settings', 'invaise_checkout_base_url', [
         'default' => INVAISE_CHECKOUT_DEFAULT_BASE_URL,
     ]);
+    // Card #391: only names the GA4 session cookie; empty or malformed is stored as ''.
+    register_setting('invaise_checkout_settings', 'invaise_checkout_ga4_measurement_id', [
+        'default' => '',
+        'sanitize_callback' => function ($v) {
+            $v = strtoupper(trim((string) $v));
+            return preg_match('/^G-[A-Z0-9]{4,20}$/', $v) ? $v : '';
+        },
+    ]);
 });
 
 function invaise_checkout_render_settings_page() {
@@ -29,6 +37,7 @@ function invaise_checkout_render_settings_page() {
     $api_key    = get_option('invaise_checkout_api_key', '');
     $has_secret = (bool) get_option('invaise_checkout_api_secret', '');
     $base_url   = get_option('invaise_checkout_base_url', INVAISE_CHECKOUT_DEFAULT_BASE_URL);
+    $ga4_id     = invaise_checkout_ga4_measurement_id();
     ?>
     <div class="wrap">
         <h1>invAIse Checkout</h1>
@@ -62,6 +71,16 @@ function invaise_checkout_render_settings_page() {
                         <p class="description">Leave blank to keep the currently saved secret.</p>
                     </td>
                 </tr>
+                <tr>
+                    <th scope="row"><label for="invaise_checkout_ga4_measurement_id">GA4 Measurement ID</label></th>
+                    <td>
+                        <input type="text" id="invaise_checkout_ga4_measurement_id" name="invaise_checkout_ga4_measurement_id"
+                               value="<?php echo esc_attr($ga4_id); ?>" class="regular-text" placeholder="G-XXXXXXXXXX" />
+                        <p class="description">Optional. With the visitor's analytics consent, the "Order now" button passes their
+                        GA4 ids to invAIse, which reports the purchase to GA4 itself after payment (set the same ID on the
+                        Brand in invAIse). Leave empty to pass no session id.</p>
+                    </td>
+                </tr>
             </table>
             <?php submit_button(); ?>
         </form>
@@ -72,6 +91,11 @@ function invaise_checkout_render_settings_page() {
         <code>[invaise_checkout activity_id="1" label="Order now" quantity_field="true" quantity_label="Number of users" quantity_default="2"]</code>
     </div>
     <?php
+}
+
+function invaise_checkout_ga4_measurement_id() {
+    $v = (string) get_option('invaise_checkout_ga4_measurement_id', '');
+    return preg_match('/^G-[A-Z0-9]{4,20}$/', $v) ? $v : '';
 }
 
 // Don't overwrite a saved secret with a blank resubmit of the settings form.

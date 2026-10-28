@@ -19,6 +19,8 @@ if (!defined('ABSPATH')) exit;
 // [invaise_checkout activity_id="1" label="Order now" quantity_field="true"
 //                    quantity_label="Number of users" quantity_default="1"
 //                    success_url="..." cancel_url="..."]
+// Optional for GA4 (card #391), only for the dataLayer begin_checkout event (no revenue):
+//                    item_name="MFS Connect" price="10" currency="EUR"
 // product="..." (1.2.0) is still accepted but no longer shown (1.3.0: the checkout page shows the product).
 add_shortcode('invaise_checkout', function ($atts) {
     static $instance_count = 0;
@@ -33,6 +35,9 @@ add_shortcode('invaise_checkout', function ($atts) {
         'quantity_default'  => '1',
         'success_url'       => '',
         'cancel_url'        => '',
+        'item_name'         => '',
+        'price'             => '',
+        'currency'          => '',
     ], $atts, 'invaise_checkout');
 
     if (empty($atts['activity_id']) || !ctype_digit((string) $atts['activity_id'])) {
@@ -58,7 +63,10 @@ add_shortcode('invaise_checkout', function ($atts) {
          data-activity-id="<?php echo esc_attr($atts['activity_id']); ?>"
          data-product="<?php echo esc_attr($atts['product']); ?>"
          data-success-url="<?php echo esc_attr($success_url); ?>"
-         data-cancel-url="<?php echo esc_attr($cancel_url); ?>">
+         data-cancel-url="<?php echo esc_attr($cancel_url); ?>"
+         data-item-name="<?php echo esc_attr($atts['item_name'] ?: $atts['product']); ?>"
+         data-price="<?php echo esc_attr(is_numeric($atts['price']) ? $atts['price'] : ''); ?>"
+         data-currency="<?php echo esc_attr(preg_match('/^[A-Za-z]{3}$/', $atts['currency']) ? strtoupper($atts['currency']) : ''); ?>">
         <?php if ($show_quantity): ?>
         <p class="invaise-checkout-quantity-row">
             <label>
@@ -115,6 +123,8 @@ function invaise_checkout_enqueue_assets() {
     wp_localize_script('invaise-checkout', 'invaiseCheckout', [
         'ajaxUrl' => admin_url('admin-ajax.php'),
         'nonce'   => wp_create_nonce('invaise_checkout_submit'),
+        // Card #391: names the GA4 session cookie (_ga_<id>); not a secret.
+        'ga4MeasurementId' => invaise_checkout_ga4_measurement_id(),
         'strings' => [
             'genericError'  => 'Something went wrong -- please try again.',
             'starting'      => 'One moment…',
@@ -152,18 +162,28 @@ function invaise_checkout_ajax_submit() {
         wp_send_json_error(['error' => 'invAIse Checkout is not configured yet -- add API credentials under Settings → invAIse Checkout.'], 500);
     }
 
+    $payload = [
+        'activity_id' => $activity_id,
+        'quantity'    => $quantity,
+        'success_url' => $success_url,
+        'cancel_url'  => $cancel_url,
+    ];
+    // Card #391: the visitor's GA4 ids (the browser only sends them with analytics consent), so
+    // invAIse can attribute its server-side purchase event. Anything malformed is dropped.
+    $ga_client_id  = isset($_POST['ga_client_id']) ? sanitize_text_field(wp_unslash($_POST['ga_client_id'])) : '';
+    $ga_session_id = isset($_POST['ga_session_id']) ? sanitize_text_field(wp_unslash($_POST['ga_session_id'])) : '';
+    if (preg_match('/^\d{1,20}\.\d{1,20}$/', $ga_client_id)) {
+        $payload['ga_client_id'] = $ga_client_id;
+        if (preg_match('/^\d{1,20}$/', $ga_session_id)) $payload['ga_session_id'] = $ga_session_id;
+    }
+
     $response = wp_remote_post($base_url . '/api/v1/checkout/start', [
         'timeout' => 15,
         'headers' => [
             'Content-Type'  => 'application/json',
             'Authorization' => 'Bearer ' . $api_key . ':' . $api_secret,
         ],
-        'body' => wp_json_encode([
-            'activity_id' => $activity_id,
-            'quantity'    => $quantity,
-            'success_url' => $success_url,
-            'cancel_url'  => $cancel_url,
-        ]),
+        'body' => wp_json_encode($payload),
     ]);
 
     if (is_wp_error($response)) {
