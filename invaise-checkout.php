@@ -8,7 +8,7 @@
  *              database access, and no business logic live in this plugin -- same philosophy as
  *              MSTeamsFS's own lightweight module design. See
  *              invAIse_ManagedFreeScout_Checkout_Cutover_Spec_v1.md and card #174.
- * Version: 1.3.3
+ * Version: 1.4.0
  * Update URI: https://github.com/invAIse/invaise-checkout
  * Author: StackPros
  * Author URI: https://stackpros.io
@@ -16,7 +16,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('INVAISE_CHECKOUT_VERSION', '1.3.3');
+define('INVAISE_CHECKOUT_VERSION', '1.4.0');
 define('INVAISE_CHECKOUT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 
 // Updates (invaise card #278): WordPress shows "Update available" for new GitHub Releases of
